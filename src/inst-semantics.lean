@@ -5,30 +5,23 @@ set_option pp.generalized_field_notation false
 
 namespace LoVe
 
-/-!
-Is this the best way to do this?
-I tried to do it this way to get
-relations of any arity, but it does mean
-that to construct a relation of many arity
-you need to do
-`relation (A → (relation B → (relation C → sig D)))`
-or something like that
--/
-inductive forge_rel (α β : Type) : Type → Type
-| sig : forge_rel α
-| relation : forge_rel (α → β)
+inductive sig : Type
+| extend : name → sig → sig
+| root : sig
 
-/-!
-In the semantics for bound_refinement from the paper,
-do these take in two forge_rels?
-can they take in atoms?
--/
-inductive binding (α : Type) : Type
-| and : α → α → binding
-  --Lean has an `in` keyword
-| inst_in : α → α → binding
-| not_in : α → α → binding
+inductive relation : Type
+-- sigs are relations of arity 1
+| sig : sig → relation
+-- if you want a relation of arity more than 1
+| rel : sig → relation → relation
 
-inductive bounds 
+inductive atom : Type
+| atom : name → sig → atom
+
+-- so that binds can take in sigs or relations
+inductive atom_or_sig_or_rel : Type
+| atom : atom → atom_or_sig_or_rel
+| sig : sig → atom_or_sig_or_rel
+| rel : relation → atom_or_sig_or_rel
 
 end LoVe
