@@ -17,4 +17,12 @@ inductive atom_or_sig_or_rel : Type
 | sig : sig → atom_or_sig_or_rel
 | rel : relation → atom_or_sig_or_rel
 
+def sig_bound := sig -> list atom
+
+structure sig_bounds :=
+(lower : sig_bound)
+(upper : sig_bound)
+
+
+
 end LoVe
