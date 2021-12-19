@@ -144,4 +144,12 @@ begin
     exact hlu, },
 end
 
+lemma comm [decidable_eq sig] [decidable_eq atom] [decidable_eq relation]
+ (a b : inst) (bounds : all_bounds):
+  refine_bounds (inst.and a b) bounds = refine_bounds (inst.and b a) bounds :=
+begin
+
+end
+
+
 end LoVe
