@@ -150,14 +150,21 @@ begin
     exact hlu, },
 end
 
+lemma comm_binary [decidable_eq sig] [decidable_eq atom] [decidable_eq relation]
+  (bounds : all_bounds) (a : inst) (b : inst) :
+  (refine_bounds [a, b] bounds) = (refine_bounds [b, a] bounds) :=
+begin
+  
+  sorry
+  
+end
+
 lemma comm [decidable_eq sig] [decidable_eq atom] [decidable_eq relation]
   (bounds : all_bounds) (insthd : inst) (rst : list inst) :
   (refine_bounds (insthd :: rst) bounds) = (refine_bounds (rst.append [insthd]) bounds) :=
 begin
   rw refine_bounds,
-  cases' insthd,
-  rw refine_bound,
-  
+  sorry
 end
 
 end LoVe
