@@ -144,4 +144,52 @@ begin
     exact hlu, },
 end
 
+def new_bounds : all_bounds :=
+(all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
+               (rel_bounds.mk (λx, ∅) (λx, set.univ)))
+
+lemma and_assoc [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (i1 i2 i3 : inst) :
+  refine_bounds (inst.and i1 (inst.and i2 i3)) new_bounds = refine_bounds (inst.and (inst.and i1 i2) i3) new_bounds :=
+by refl
+
+lemma add_comm [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (i1 i2 : inst) :
+  refine_bounds (inst.and i1 i2) new_bounds = refine_bounds (inst.and i2 i1) new_bounds :=
+sorry
+/-!
+begin
+  cases' i1,
+  case and {
+    sorry
+  },
+  case sig_in_atoms {
+    calc refine_bounds (inst.and (inst.sig_in_atoms x x_1) i2) new_bounds
+        = refine_bounds i2 (refine_bounds (inst.sig_in_atoms x x_1) new_bounds) : sorry
+    ... = refine_bounds i2 (all_bounds.mk (sig_bounds.mk (λx, ∅) (λ(s : sig), if s = x then set.univ ∩ x_1 else set.univ))
+                                          (rel_bounds.mk (λx, ∅) (λx, set.univ))) : sorry
+    ... = sorry
+    sorry
+  },
+end
+-/
+
+lemma and_reverse [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (i1 i2 i3 : inst) :
+  refine_bounds (inst.and i1 (inst.and i2 i3)) new_bounds = refine_bounds (inst.and i3 (inst.and i2 i1)) new_bounds :=
+calc refine_bounds (inst.and i1 (inst.and i2 i3)) new_bounds
+    = refine_bounds (inst.and i2 i3) (refine_bounds i1 new_bounds) :
+  by refl
+... = refine_bounds i3 (refine_bounds i2 (refine_bounds i1 new_bounds)) :
+  by refl
+... = refine_bounds i3 (refine_bounds i1 (refine_bounds i2 new_bounds)) :
+  begin
+    have hi1i2eq : (refine_bounds i2 (refine_bounds i1 new_bounds)) = (refine_bounds i1 (refine_bounds i2 new_bounds)) :=
+      by apply add_comm,
+    rw hi1i2eq,
+  end
+... = refine_bounds i3 (refine_bounds (inst.and i2 i1) new_bounds) :
+  by refl
+... = refine_bounds (inst.and (inst.and i2 i1) i3) new_bounds :
+  by refl
+... = refine_bounds (inst.and i3 (inst.and i2 i1)) new_bounds :
+  by apply add_comm
+
 end LoVe
