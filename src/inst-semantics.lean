@@ -31,16 +31,14 @@ structure all_bounds :=
 --For now, each bind must include a list of atoms
 --For now, ignore `not in`
 inductive inst : Type
-| and : inst → inst → inst
 | sig_in_atoms : sig → set atom → inst
 | atoms_in_sig : set atom → sig → inst
 | rel_in_atoms : relation → set (list atom) → inst
 | atoms_in_rel : set (list atom) → relation → inst
 
-def refine_bounds [decidable_eq sig] [decidable_eq relation] : inst → all_bounds → all_bounds
-| (inst.and i1 i2) (bounds : all_bounds) := refine_bounds i2 (refine_bounds i1 bounds)
+def refine_bound [decidable_eq sig] [decidable_eq relation] : inst → all_bounds → all_bounds
 | (inst.sig_in_atoms s1 atoms) (bounds : all_bounds) :=
-  all_bounds.mk (
+  (all_bounds.mk (
     sig_bounds.mk bounds.sigs.lower (
       λ(s : sig),
         if s = s1 then
@@ -49,8 +47,9 @@ def refine_bounds [decidable_eq sig] [decidable_eq relation] : inst → all_boun
           bounds.sigs.upper s
     )
   ) bounds.rels
+  ) 
 | (inst.atoms_in_sig atoms s1) (bounds : all_bounds) :=
-  all_bounds.mk (
+  (all_bounds.mk (
     sig_bounds.mk (
       λ(s : sig),
         if s = s1 then
@@ -59,18 +58,20 @@ def refine_bounds [decidable_eq sig] [decidable_eq relation] : inst → all_boun
           bounds.sigs.lower s
     ) bounds.sigs.upper
   ) bounds.rels
+  )
 | (inst.rel_in_atoms r1 atoms) (bounds : all_bounds) :=
-  all_bounds.mk bounds.sigs (
-    rel_bounds.mk bounds.rels.lower (
+  (all_bounds.mk bounds.sigs 
+   (rel_bounds.mk bounds.rels.lower (
       λ(r : relation),
         if r = r1 then
           atoms ∩ (bounds.rels.upper r)
         else
           bounds.rels.upper r
+      )
     )
   )
 | (inst.atoms_in_rel atoms r1) (bounds : all_bounds) :=
-  all_bounds.mk bounds.sigs (
+   (all_bounds.mk bounds.sigs (
     rel_bounds.mk (
       λ(r : relation),
         if r = r1 then
@@ -79,18 +80,23 @@ def refine_bounds [decidable_eq sig] [decidable_eq relation] : inst → all_boun
           bounds.rels.lower r
     ) bounds.rels.upper
   )
+)
+
+def refine_bounds [decidable_eq sig] [decidable_eq relation] : list inst → all_bounds → all_bounds
+| [] (bounds : all_bounds) := bounds
+| (insthd :: rst) (bounds : all_bounds) := refine_bounds rst (refine_bound insthd bounds)
 
 lemma bounds_conflict_carries_for_sig [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (s1 : sig) (lower upper : set atom) :
   (lower ⊆ upper) ↔
-    ((refine_bounds (inst.and (inst.sig_in_atoms s1 upper) (inst.atoms_in_sig lower s1))
+    ((refine_bounds  [(inst.sig_in_atoms s1 upper), (inst.atoms_in_sig lower s1)]
                        (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
                                       (rel_bounds.mk (λx, ∅) (λx, set.univ)))).sigs.lower s1)
         ⊆
-       ((refine_bounds (inst.and (inst.sig_in_atoms s1 upper) (inst.atoms_in_sig lower s1))
+       ((refine_bounds [(inst.sig_in_atoms s1 upper), (inst.atoms_in_sig lower s1)]
                        (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
                                       (rel_bounds.mk (λx, ∅) (λx, set.univ)))).sigs.upper s1) :=
 begin
-  have hlower : lower = (refine_bounds (inst.and (inst.sig_in_atoms s1 upper) (inst.atoms_in_sig lower s1))
+  have hlower : lower = (refine_bounds [(inst.sig_in_atoms s1 upper), (inst.atoms_in_sig lower s1)]
                        (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
                                       (rel_bounds.mk (λx, ∅) (λx, set.univ)))).sigs.lower s1 :=
       begin
@@ -104,12 +110,12 @@ begin
                                              (λ(s : sig), if s = s1 then (upper ∩ set.univ) else set.univ))
                               (rel_bounds.mk (λx, ∅) (λx, set.univ))).sigs.lower s1 :
           by simp
-        ... = (refine_bounds (inst.and (inst.sig_in_atoms s1 upper) (inst.atoms_in_sig lower s1))
+        ... = (refine_bounds [(inst.sig_in_atoms s1 upper), (inst.atoms_in_sig lower s1)]
                        (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
                                       (rel_bounds.mk (λx, ∅) (λx, set.univ)))).sigs.lower s1 :
           by refl
       end,
-  have hupper : upper = (refine_bounds (inst.and (inst.sig_in_atoms s1 upper) (inst.atoms_in_sig lower s1))
+  have hupper : upper = (refine_bounds [(inst.sig_in_atoms s1 upper), (inst.atoms_in_sig lower s1)]
                        (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
                                       (rel_bounds.mk (λx, ∅) (λx, set.univ)))).sigs.upper s1 :=
       begin
@@ -123,7 +129,7 @@ begin
                                              (λ(s : sig), if s = s1 then (upper ∩ set.univ) else set.univ))
                               (rel_bounds.mk (λx, ∅) (λx, set.univ))).sigs.upper s1 :
           by simp
-        ... = (refine_bounds (inst.and (inst.sig_in_atoms s1 upper) (inst.atoms_in_sig lower s1))
+        ... = (refine_bounds [(inst.sig_in_atoms s1 upper), (inst.atoms_in_sig lower s1)]
                        (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
                                       (rel_bounds.mk (λx, ∅) (λx, set.univ)))).sigs.upper s1 :
           by refl
@@ -142,6 +148,16 @@ begin
     rw ←hlower,
     intro hlu,
     exact hlu, },
+end
+
+lemma comm [decidable_eq sig] [decidable_eq atom] [decidable_eq relation]
+  (bounds : all_bounds) (insthd : inst) (rst : list inst) :
+  (refine_bounds (insthd :: rst) bounds) = (refine_bounds (rst.append [insthd]) bounds) :=
+begin
+  rw refine_bounds,
+  cases' insthd,
+  rw refine_bound,
+  
 end
 
 end LoVe
