@@ -14,21 +14,36 @@ Similarly, we could say (`C0 ->`C1 + `C1 ->`C0) in Roads,
 where Roads is a relation of the type City -> City
 -/
 
+-- A `sig` is like a type signature and a set of objects; once you've declared a sig
+-- various atoms in your forge specification can have that sig as their type.
+-- if you have a sig `City`, then you could have various atoms with type City.
+-- In general, Forge treats sigs more like sets of elements than types;
+-- everything of type City is an element of the set of all Cities,
+-- and saying `City` refers to the set of all Citites.
 structure sig := (name : string)
 
 -- a relation has a name (e.g. Roads), and is between a list of sigs
 -- for example Roads is of the type City -> City
 -- Position could be of the type Person -> Time -> Location 
--- where Person, Time, Location are sigs
+-- where Person, Time, Location are sigs.
+-- Then, Position would map atoms in the set of Persons
+-- to atoms in the set of Times to atoms in the set of Locations
 structure relation := (name : string) (sigs : list sig)
 
 -- an atom could be thought of as a specific instance of the sig,
 -- specified in the partial instance
 -- For the bound (`C0 + `C1) in City,
 -- `C0  is an atom with name "C0" of the sig City
+-- These are the elements of the sets which sigs are
 structure atom := (name : string) (sig : sig)
 
--- the upper or lower bound of a sig, which is a set of atoms
+-- the upper or lower bound of a sig
+-- these bounds are set of atoms
+-- In any instance that the SAT solver considers
+-- the lower bound must be a subset of the sig
+-- and the upper bound must be a superset of the sig
+-- so if the lower bound is {a,b,c} and the upper bound is {a,b,c,d,e}
+-- then the possible instances are {a,b,c}, {a,b,c,d}, and {a,b,c,d,e}
 def sig_bound := sig → set atom
 
 -- the final bound of a sig should have a lower bound and an upper bound
@@ -40,6 +55,10 @@ structure sig_bounds :=
 
 -- a rel_bound would look like
 -- Roads -> {[`C0, `C1], [`C1, `C0]}
+-- These work just like sig names except with tuples instead
+-- so in every instance that the SAT solver looks,
+-- every tuple in the lower bound will be in the relation
+-- and every tuple in the relation will be in the upper bound
 def rel_bound := relation → set (list atom)
 
 -- similar to sigs, a relation has a lower bound  and an upper bound
@@ -47,15 +66,19 @@ structure rel_bounds :=
 (lower : rel_bound)
 (upper : rel_bound)
 
+-- `inst` is a keyword in Forge which starts a block in which
+-- a user can explicitly specify bounds for as many sigs and relations as they'd like
+-- the semantics for an inst block thus must know what bounds have been specified
+-- this is kept track of in a `bounding context`
+-- here, the bounding context will be represented by this `all_bounds` data structure,
+-- which contains the lower and upper bounds for sigs and the lower and upper bounds for relations
 structure all_bounds :=
 (sigs : sig_bounds)
 (rels : rel_bounds)
 
---For now, ignore `join`
---For now, each bind must include a list of atoms
---For now, ignore `not in`
-
 /-
+This inductive type represents various expressions you could have in
+an `inst` block in forge - each such expression specifies a bound
 We are considering 4 kinds of bounds:
 
 (`C0 + `C1) in City : atoms in sig City
@@ -72,6 +95,7 @@ inductive inst : Type
 
 /-
 Given an instance and the refined bounds we ahve so far, we arrive at new refined bounds
+These are the semantics for how to udpate the bounds when running for a forge `inst`.
 -/
 def refine_bound [decidable_eq sig] [decidable_eq relation] : inst → all_bounds → all_bounds
 | (inst.sig_in_atoms s1 atoms) (bounds : all_bounds) :=
@@ -120,15 +144,14 @@ def refine_bound [decidable_eq sig] [decidable_eq relation] : inst → all_bound
 )
 
 /-
-Recursively refine bounds for all instss in a list of instances
+Recursively refine bounds for all insts in a list of instances
 -/
-
 def refine_bounds [decidable_eq sig] [decidable_eq relation] : list inst → all_bounds → all_bounds
 | [] (bounds : all_bounds) := bounds
 | (insthd :: rst) (bounds : all_bounds) := refine_bounds rst (refine_bound insthd bounds)
 
 /-
-an default starting bound, before looking at any inst
+a default starting bound, before looking at any inst
 -/
 def new_bounds : all_bounds :=
 (all_bounds.mk (sig_bounds.mk (λx, ∅) (λx, set.univ))
@@ -137,7 +160,11 @@ def new_bounds : all_bounds :=
 
 /-
 When there are bound conflicts in insts,
-there are bound confilcts in the resulting refined bounds
+there are bound confilcts in the resulting refined bounds,
+and bound conflicts in the resulting bounds can only appear
+when there was already a bounds conflict in the inst.
+
+A bounds conflict occurs when the lower bound is not a subset of the upper bound.
 -/
 lemma bounds_conflict_carries_for_sig [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (s1 : sig) (lower upper : set atom) :
   (lower ⊆ upper) ↔
@@ -255,9 +282,8 @@ end
   Turns out the only good way is to use casework
   But then you need to do cases on i1 and i2, which gives you at least 16 cases total
   So we decided it's not worth the time
--/
-
 -- whether we refine the list of insts [i1, i2] or [i2, i1], we get the same result
+-/
 lemma comm_binary [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (i1 i2 : inst) (bounds : all_bounds) :
   refine_bounds [i1, i2] bounds = refine_bounds [i2, i1] bounds :=
 sorry
@@ -270,10 +296,10 @@ sorry
   The problem is the case with length 3 we could only do by casework, and we thought it wasn't worth doing the 64 cases that gives us
   We also could not figure out how to tell lean "we would like to induct, but we want to induct for cases with length >= 3
   and do the other cases by hand" instead of having it induct on all cases of size >= 1
--/
-
 -- whether we refine the list of insts [i1, ...] or [..., i1], we get the same result
--- would imply that we can refine the list of inst in any order
+-- would imply that we can refine the list of inst in any order,
+-- which means that you get the same final bounds no matter what order you apply the bounds in the inst in.
+-/
 lemma comm [decidable_eq sig] [decidable_eq atom] [decidable_eq relation]
   (bounds : all_bounds) (insthd : inst) (rst : list inst) :
   (refine_bounds (insthd :: rst) bounds) = (refine_bounds (rst.append [insthd]) bounds) :=
@@ -282,6 +308,7 @@ begin
   sorry
 end
 
+-- Even if you go through the list of bounds backwards, you end up with your desired bounds eventually.
 lemma inst_reverse [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (i1 i2 i3 : inst) (bound : all_bounds) :
   refine_bounds [i1, i2, i3] bound = refine_bounds [i3, i2, i1] bound :=
 calc refine_bounds [i1, i2, i3] bound
@@ -304,6 +331,7 @@ calc refine_bounds [i1, i2, i3] bound
 ... = refine_bounds [i3, i2, i1] bound:
   by refl
 
+-- With multiple pairs of bounds, you can choose which pair to do first without changing the meaning
 lemma inst_assoc [decidable_eq sig] [decidable_eq atom] [decidable_eq relation] (i1 i2 i3 : inst) (bounds : all_bounds):
   refine_bounds [i1] (refine_bounds [i2, i3] bounds) = refine_bounds [i1, i2] (refine_bounds [i3] bounds) :=
 calc refine_bounds [i1] (refine_bounds [i2, i3] bounds)
